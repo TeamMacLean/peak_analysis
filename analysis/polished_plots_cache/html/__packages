@@ -1,0 +1,14 @@
+base
+magrittr
+ggplot2
+dplyr
+tidyr
+purrr
+WaveletComp
+fluorpeaks
+bindrcpp
+geepack
+Matrix
+geeM
+MESS
+nlme

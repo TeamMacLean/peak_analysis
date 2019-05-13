@@ -1,0 +1,161 @@
+---
+title: "Curve Analysis"
+date: "12/03/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Wavelet Analysis of spectral data 
+
+This document presents the steps and results of a wavelet analysis from the raw data to the final plot presented in Thor et al.
+
+## Initial Curve Inspection
+
+Below we present the raw curves of fluorescence intensity over time, split by cell-number, tech-rep, and genotype. These intensity curves are very noisy with an intensity decay as time progresses. 
+
+```{r, load, fig.width=12, fig.height=12, cache=TRUE}
+
+library(magrittr)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(WaveletComp)
+library(MESS)
+
+
+devtools::load_all("../fluorpeaks")
+d <- read_peaks("../data/raw_data.xlsx") %>% rename_kathrin()
+d
+
+d %>% all_data_plot()
+
+```
+
+## YFP/CFP Ratio over time
+
+The computed YFP/CFP ratio is the primary metric of interest. Data are presented up to 50 minutes, the data collection end point. The curves remain noisy but the initial peak followed by decay is observable.
+
+```{r, ratio, fig.width=12, fig.height=12,cache=TRUE}
+
+ratio_added <- d %>% 
+  filter(has_started == TRUE, minutes <= 50) %>%
+  group_by(line, bio_rep, tech_rep, cell_number) %>% 
+  ratio_curve(value = intensity )  
+
+ratio_added %>% ratio_plot()
+
+```
+
+## Wavelet Extraction of Signifcant Signal
+
+In order to find the significant large signal structure within the noisy curve, we apply a wavelet reconstruction of the curves. 
+
+```{r, wavelet, fig.width = 12, fig.height=12, cache=TRUE}
+
+wavelet_reconstruction <- function(df, span = 100, re_scale = FALSE, val_col = "intensity"){
+  bin <- capture.output(wave <- analyze.wavelet(df, val_col, loess.span = span, verbose = FALSE) )
+  bin <- capture.output(r <- reconstruct(wave, plot.waves = FALSE, plot.rec = FALSE, rescale = re_scale) )
+  
+  tag <- paste0(val_col, ".r")
+  return(data.frame(reconstructed_intensity = r$series[[tag]]) )
+}
+
+
+
+ratio_added %>% 
+  filter(has_started == TRUE, minutes <= 50) %>%
+  group_by(line, bio_rep, tech_rep, cell_number) %>%
+  nest() %>%
+  mutate(reconstructed = map(data, wavelet_reconstruction, val_col = "ratio" ) ) %>%
+  unnest() %>%
+  ratio_recons_plot()
+
+```
+
+## Area Under Curve $t \leq 5 \textrm{minutes}$
+
+Assuming that OSCA1.3 as a plasma membrane calcium channel activated by BIK1 is involved in the immediate calcium influx after flg22 perception. We therefore can look at the area under the wavelet curve (AUC) in the first five minutes. 
+
+```{r, short_wavelet, fig.width=12, fig.height=12, cache = TRUE}
+get_auc <- function(df){
+  
+  steps <- 1:length(df$ratio)
+  auc(steps, df$ratio, absolutearea = TRUE)
+  
+}
+
+auc_data_short <- ratio_added %>% 
+  filter(has_started == TRUE, minutes <= (start_time + 5) ) %>%
+  group_by(line, bio_rep, tech_rep, cell_number) %>%
+  nest() %>%
+  mutate(aucurve = map(data, get_auc)) %>%
+  unnest( .preserve = c(aucurve)) %>% unnest() %>% 
+  group_by(line, bio_rep, tech_rep, cell_number) %>%
+  summarise(n_auc = n_distinct(aucurve), act_auc = first(aucurve) )
+
+auc_data_short
+
+ggplot(auc_data_short) + aes(bio_rep, as.integer(act_auc) ) + geom_boxplot(aes(colour = line), notch = TRUE) + geom_jitter(aes(colour = line), position = position_dodge(width = 0.5)) 
+
+```
+
+## Significance Testing of AUC $t \leq 5 \textrm{minutes}$.
+
+A linear model of the AUC responding to genotype followed by ANOVA is used to test the null hypothesis that the difference between the mean AUC between genotypes is equal to 0.
+
+```{r}
+library(nlme)
+model <- lme(act_auc ~ line, random =~ 1|bio_rep, data = auc_data_short)
+summary(model)
+anova(model)
+```
+
+With ths model $ p < 0.05$, indicating that the difference between the mean AUCs of the genotypes is not likely to be 0. We therefore reject the null hypothesis.
+
+## Effect Size Between Genotypes
+
+The size of the effect is computed by taking difference in means between AUC in the genotypes. We express as a percentage difference.
+
+```{r}
+library(dplyr)
+group_means <- auc_data_short %>% 
+  group_by(line) %>%
+  summarise(mean = mean(act_auc))
+
+group_means
+```
+
+Percent change = `r 100 - (100 * (min(group_means$mean) / max(group_means$mean) )) ` .
+
+## Final Image
+
+A rendering of the AUC data in a single, print-friendly panel.
+
+```{r}
+library(ggplot2)
+library(forcats)
+auc_data_short$line <- factor(auc_data_short$line, levels = rev(levels(as.factor(auc_data_short$line))))
+auc_data_short
+
+xlabels <- c(
+  expression(paste("WT")), 
+  expression(paste(italic("osca1.3/1.7")))
+  )
+
+
+ggplot(auc_data_short) + aes(line, as.integer(act_auc) ) + geom_boxplot(aes(colour = line), notch = TRUE) + geom_jitter(aes(colour = line, shape = bio_rep), position = position_dodge(width = 0.5))  +
+  scale_x_discrete(labels = xlabels ) +
+  theme_bw() + 
+  labs(x = NULL, y = "Area Under Curve") + 
+  theme(legend.position = "none") + 
+  scale_colour_manual(values= c("black", "black")) + 
+  theme(axis.title = element_text(family = "Helvetica", size = 14)) + 
+  theme(axis.text.x = element_text(family = "Helvetica", size = 12, colour = "black"))
+
+ggsave("cameleon.svg", width = 55, height = 100, units = "mm")
+ggsave("cameleon.png", width = 55, height = 100, units = "mm")
+```
