@@ -158,4 +158,6 @@ ggplot(auc_data_short) + aes(line, as.integer(act_auc) ) + geom_boxplot(aes(colo
 
 ggsave("cameleon.svg", width = 55, height = 100, units = "mm")
 ggsave("cameleon.png", width = 55, height = 100, units = "mm")
+
+readr::write_csv(auc_data_short, "graph_data.csv")
 ```
