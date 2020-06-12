@@ -16,7 +16,7 @@ This document presents the steps and results of a wavelet analysis from the raw 
 
 Below we present the raw curves of fluorescence intensity over time, split by cell-number, tech-rep, and genotype. These intensity curves are very noisy with an intensity decay as time progresses. 
 
-```{r, load, fig.width=12, fig.height=12, cache=TRUE}
+```{r, load, fig.width=12, fig.height=12, cache=FALSE}
 
 library(magrittr)
 library(ggplot2)
@@ -27,7 +27,8 @@ library(WaveletComp)
 library(MESS)
 
 
-devtools::load_all("../fluorpeaks")
+source("../src/load_data.R")
+source("../src/plots.R")
 d <- read_peaks("../data/raw_data.xlsx") %>% rename_kathrin()
 d
 
@@ -95,7 +96,8 @@ auc_data_short <- ratio_added %>%
   mutate(aucurve = map(data, get_auc)) %>%
   unnest( .preserve = c(aucurve)) %>% unnest() %>% 
   group_by(line, bio_rep, tech_rep, cell_number) %>%
-  summarise(n_auc = n_distinct(aucurve), act_auc = first(aucurve) )
+  summarise(n_auc = n_distinct(aucurve), act_auc = first(aucurve) ) %>% 
+  ungroup()
 
 auc_data_short
 
@@ -114,7 +116,7 @@ summary(model)
 anova(model)
 ```
 
-With ths model $ p < 0.05$, indicating that the difference between the mean AUCs of the genotypes is not likely to be 0. We therefore reject the null hypothesis.
+With the model $ p < 0.05$, indicating that the difference between the mean AUCs of the genotypes is not likely to be 0. We therefore reject the null hypothesis.
 
 ## Effect Size Between Genotypes
 
@@ -123,8 +125,9 @@ The size of the effect is computed by taking difference in means between AUC in 
 ```{r}
 library(dplyr)
 group_means <- auc_data_short %>% 
+  ungroup() %>% 
   group_by(line) %>%
-  summarise(mean = mean(act_auc))
+  summarise(mean = mean(act_auc)) 
 
 group_means
 ```
@@ -138,6 +141,7 @@ A rendering of the AUC data in a single, print-friendly panel.
 ```{r}
 library(ggplot2)
 library(forcats)
+
 auc_data_short$line <- factor(auc_data_short$line, levels = rev(levels(as.factor(auc_data_short$line))))
 auc_data_short
 
