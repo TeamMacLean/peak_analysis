@@ -76,6 +76,7 @@ knitr::include_graphics("https://upload.wikimedia.org/wikipedia/commons/thumb/1/
 Although more spread out our data are somewhere between 1 and 2. Doing the power analysis test at effect size $d=2$ and $d=1$
 
 ```{r}
+library(pwr)
 pwr.t2n.test(n1=23, n2=29, d=2, sig.level=0.05, alternative = "greater")
 pwr.t2n.test(n1=23, n2=29, d=1, sig.level=0.05, alternative = "greater")
 ```
