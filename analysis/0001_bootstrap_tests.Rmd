@@ -1,0 +1,86 @@
+---
+title: "Permutation tests and Power analysis"
+author: "Dan MacLean"
+date: "07/07/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+## Permutation tests
+
+The first objective of this document is to teste whether the data presented in Figure 9a of Thor _et al_ are sensitive to single values causing the $p$-value. We will test this with a permutation and bootstrap version of the Welch Two-Sample $t$-test as provided in the `MKinfer` package.
+
+### Load the data
+
+```{r}
+library(MKinfer)
+library(readxl)
+
+df <- read_excel("../data/352511_3_source_data_3424401_q9ndxw.xlsx", sheet = 'Ext Data Fig 9a', range = "BN5:BO34")
+
+df
+col <- na.omit(df$`Col-0`)
+osca <- na.omit(df$`osca1.3/1.7`)
+```
+
+### Perform permutation $t$-tests and bootstrap $t$-tests
+
+```{r}
+perm.t.test(col, osca, alternative = "greater")
+boot.t.test(col,osca, alternative = "greater")
+```
+
+We observe the $p$-value for permuted and bootstrapped data to remain at a less than 0.05 significance level and conclude that the differences observed in the original Welch Two Sample $t$-test are not due to just a few data points.
+
+### Variance distribution of permutations
+
+The objective here is to see whether the observed variance for `col` and `osca` match the resampled versions.
+
+We'll generate a distribution of 10000 samples from the data and draw the density plot of the variance of the samples, then overlay the observed `col` and `osca` variances.
+
+```{r}
+library(gtools)
+all <- c(col, osca)
+samples <- lapply(1:10000, function(x) sample(all, size = length(osca), replace = TRUE) ) 
+vars <- lapply(samples, function(s) sd(s) ^ 2)
+vars <- unlist(vars)
+
+plot(density(vars))
+abline(v = sd(osca) ^ 2, lty="dashed", col="red")
+abline(v = sd(col) ^ 2, lty="dashed", col="blue")
+
+```
+
+Blue is `osca` and red is `col`. We conclude that the variances in the resamples are similar to those observed in the original data.
+
+## Power Analyses
+
+First, we'll look at the difference between the sample distributions
+
+```{r}
+plot(density(col), col="red")
+lines(density(osca), col="blue")
+```
+
+The `osca` one is shouldered which complicates things and the distributions are wide. 
+Using these Gaussian densities as a guide to effect size, from Wikipedia [Cohen's d Gaussian - https://en.wikipedia.org/wiki/Effect_size]([https://en.wikipedia.org/wiki/Effect_size). 
+
+```{r, out.width="50%"}
+knitr::include_graphics("https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/Cohens_d_4panel.svg/1280px-Cohens_d_4panel.svg.png")
+```
+
+Although more spread out our data are somewhere between 1 and 2. Doing the power analysis test at effect size $d=2$ and $d=1$
+
+```{r}
+pwr.t2n.test(n1=23, n2=29, d=2, sig.level=0.05, alternative = "greater")
+pwr.t2n.test(n1=23, n2=29, d=1, sig.level=0.05, alternative = "greater")
+```
+
+The power lies between 1 and 0.97, indicating that across the range we're confident we have enough replicates to detect a difference of that reported.
+
+
+

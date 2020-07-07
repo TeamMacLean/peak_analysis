@@ -12,7 +12,7 @@ The code is presented as an easy-to-reproduce R Markdown document [https://rmark
 
 ```
 install.packages(c('magrittr', 'ggplot2', 'dplyr', 'purrr', 'WaveletComp',
-                    'MESS', 'nlme','forcats'))
+                    'MESS', 'nlme','forcats', 'MKinfer','gtools','pwr'))
                     
 ```
 
