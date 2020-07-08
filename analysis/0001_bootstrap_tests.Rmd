@@ -20,7 +20,7 @@ The first objective of this document is to teste whether the data presented in F
 library(MKinfer)
 library(readxl)
 
-df <- read_excel("../data/352511_3_source_data_3424401_q9ndxw.xlsx", sheet = 'Ext Data Fig 9a', range = "BN5:BO34")
+df <- read_excel("../data/Thor_3rd revision_raw data_Extended Data Figure 9.xlsx", sheet = 'Ext Data Fig 9b', range = "F5:G34")
 
 df
 col <- na.omit(df$`Col-0`)
